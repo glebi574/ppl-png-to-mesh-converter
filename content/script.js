@@ -1,5 +1,5 @@
 
-const px = 3; //pixels per line to be compressed
+const px = 2; //pixels per line to be compressed
 const s = px * px; //amount of pixels in part to be compressed
 const size = 1.823358421; //line width in ppl to overlap gradient
 
@@ -24,6 +24,9 @@ img.onload = function() {
     const width2 = img.width / px * size / 2;
 
     for (y = 0; y < img.height - px; y += px) {
+
+        let line_segment = [];
+
         for (x = 0; x < img.width - px; x += px) {
             const square = ctx.getImageData(x, y, px, px);
             r = 0, g = 0, b = 0, a = 0;
@@ -38,17 +41,15 @@ img.onload = function() {
             b = Math.trunc(b / s);
             a = Math.trunc(a / s);
 
-            mesh.vertexes.push([x / px * size        - height2, width2 - y / px * size]);
             mesh.vertexes.push([x / px * size + size - height2, width2 - y / px * size]);
 
-            mesh.segments.push([index, index + 1]);
-            index += 2;
+            line_segment.push(index);
+            index += 1;
             
-            color = ((r * 256 + g) * 256 + b) * 256 + a;
-            for (i = 0; i < 2; ++i) {
-                mesh.colors.push(color);
-            }
+            color = ((r * 256 + g) * 256 + b) * 256 + 96;
+            mesh.colors.push(color);
         }
+        mesh.segments.push(line_segment)
     }
 
     let str = "meshes={{vertexes={";
@@ -57,7 +58,11 @@ img.onload = function() {
     }
     str += '},segments={';
     for (let i of mesh.segments) {
-        str += `{${i[0]},${i[1]}},`;
+        str += '{';
+        for (let n of i) {
+            str += `${n},`;
+        }
+        str += '},';
     }
     str += '},colors={';
     for (let i of mesh.colors) {
