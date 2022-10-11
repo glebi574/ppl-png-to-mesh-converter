@@ -1,7 +1,7 @@
 
-const px = 5; //pixels per line to be compressed
+const px = 3; //pixels per line to be compressed
 const s = px * px; //amount of pixels in part to be compressed
-//const size = 1.823358421; //line width in ppl to overlap gradient
+const size = 1.823358421; //line width in ppl to overlap gradient
 
 let index = 0;
 let color, r, g, b, a;
@@ -20,9 +20,11 @@ img.src = "img.png";
 img.onload = function() {
 
     ctx.drawImage(img, 0, 0);
+    const height2 = img.height / px * size / 2;
+    const width2 = img.width / px * size / 2;
 
-    for (y = 0; y < img.height; y += px) {
-        for (x = 0; x < img.width; x += px) {
+    for (y = 0; y < img.height - px; y += px) {
+        for (x = 0; x < img.width - px; x += px) {
             const square = ctx.getImageData(x, y, px, px);
             r = 0, g = 0, b = 0, a = 0;
             for (i = 0; i < s; ++i) {
@@ -36,16 +38,14 @@ img.onload = function() {
             b = Math.trunc(b / s);
             a = Math.trunc(a / s);
 
-            mesh.vertexes.push([x + px     / 4 - img.width / 2, img.height / 2 - (y + px     / 4)]);
-            mesh.vertexes.push([x + px * 3 / 4 - img.width / 2, img.height / 2 - (y + px     / 4)]);
-            mesh.vertexes.push([x + px * 3 / 4 - img.width / 2, img.height / 2 - (y + px * 3 / 4)]);
-            mesh.vertexes.push([x + px     / 4 - img.width / 2, img.height / 2 - (y + px * 3 / 4)]);
+            mesh.vertexes.push([x / px * size        - height2, width2 - y / px * size]);
+            mesh.vertexes.push([x / px * size + size - height2, width2 - y / px * size]);
 
-            mesh.segments.push([index, index + 1, index + 2, index + 3, index]);
-            index += 4;
+            mesh.segments.push([index, index + 1]);
+            index += 2;
             
             color = ((r * 256 + g) * 256 + b) * 256 + a;
-            for (i = 0; i < 4; ++i) {
+            for (i = 0; i < 2; ++i) {
                 mesh.colors.push(color);
             }
         }
@@ -57,7 +57,7 @@ img.onload = function() {
     }
     str += '},segments={';
     for (let i of mesh.segments) {
-        str += `{${i[0]},${i[1]},${i[2]},${i[3]},${i[4]}},`;
+        str += `{${i[0]},${i[1]}},`;
     }
     str += '},colors={';
     for (let i of mesh.colors) {
