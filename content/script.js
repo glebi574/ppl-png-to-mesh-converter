@@ -132,30 +132,33 @@ img.onload = function() {
 
     console.log(mesh.vertexes.length);
 
+    const min_color = Math.min(...mesh.colors);
 
-    let str = `local l,o,m,j=${mesh.vertexes[0][0].toFixed(2)},${mesh.vertexes[0][1].toFixed(2)},${size.toFixed(2)},-1
-    local a,b=function(q)if q==l then o=o-m end return {q,o} end,function(s)local g={} for i=1,s do j=j+1 g[#g+1]=j end return g end`;
+    let str = `local l,o,m,j,x=${mesh.vertexes[0][0].toFixed(2)},${mesh.vertexes[0][1].toFixed(2)},${size.toFixed(2)},-1,${min_color}
+    local a,b,c=function(w)local h={}for k=1,#w do if w[k]==l then o=o-m end h[k]={w[k],o} end return h
+    end,function(s)local g,z={},{}for n=1,#s do z={}for i=1,s[n] do j=j+1 z[i]=j end g[n]=z end return g
+    end,function(s)local g={}for i=1,#s do g[i]=x+s[i] end return g end`;
 
-    str += " meshes={{vertexes={";
+    str += " meshes={{vertexes=a({";
     for (let i of mesh.vertexes) {
         if (number_rounding) {
             let a = i[0].toFixed(2);
             if (((Math.round(a) + 0.01) >= a) && ((Math.round(a) - 0.01) <= a))
                 a = Math.round(a);
-            str += `a(${Number(a)}),`;
+            str += `${Number(a)},`;
         } else {
-            str += `a(${i[0]}),`;
+            str += `${i[0]},`;
         }
     }
-    str += '},segments={';
+    str += '}),segments=b({';
     for (let i of mesh.segments) {
-        str += `b(${i.length}),`;
+        str += `${i.length},`;
     }
-    str += '},colors={';
+    str += '}),colors=c({';
     for (let i of mesh.colors) {
-        str += `0x${i.toString(16)},`;
+        str += `${i - min_color},`;
     }
-    str += '}}}';
+    str += '})}}';
     console.log(str);
 
 }
