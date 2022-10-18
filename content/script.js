@@ -6,9 +6,16 @@ const s = px * px; //amount of pixels in part to be compressed
 const compression = 12; //compression level(how much colors can differ to be united in one line) 0 - 256
 
 const number_rounding = true; //if true, numbers will be rounded(mostly can't be seen)
-const y_color_interpolation = false; //if true, similar colors on some lines will be interpolated(decreases size) //don't
+const const_alpha = 48;
 
 const source = "img.png" //file path
+
+function to_float(n, f) {
+    let a = n.toFixed(f);
+    if (Math.round(a) + 0.01 >= a && Math.round(a) - 0.01 <= a)
+        a = Math.round(a);
+    return Number(a);
+}
 
 function get_rgba(square) {
     let r = g = b = a = 0;
@@ -30,7 +37,7 @@ function get_color(square) {
 }
 
 function get_color_from_rgba(rgba) {
-    return (((rgba[0] * 256 + rgba[1]) * 256 + rgba[2]) * 256 + 84);
+    return (((rgba[0] * 256 + rgba[1]) * 256 + rgba[2]) * 256 + (const_alpha ? const_alpha : rgba[3]));
 }
 
 function png_to_mesh(ctx, img) {
@@ -42,21 +49,6 @@ function png_to_mesh(ctx, img) {
             line_prototype.push(get_rgba(ctx.getImageData(x, y, px, px)));
         }
         mesh_prototype.push(line_prototype);
-    }
-
-    if (y_color_interpolation) { //color interpolation on different lines
-        for (let i of mesh_prototype) {
-            console.log(i);
-            for (let n = 1; n < i.length; ++n) {
-                if (Math.abs(i[n - 1][0] - i[n][0]) < compression && Math.abs(i[n - 1][1] - i[n][1]) < compression
-                && Math.abs(i[n - 1][2] - i[n][2]) < compression && Math.abs(i[n - 1][3] - i[n][3]) < compression) {
-                    for (let f = 0; f < 4; ++f) {
-                        i[n - 1][f] = (i[n - 1][f] + i[n][f]) / 2;
-                        i[n][f] = i[n - 1][f];
-                    }
-                }
-            }
-        }
     }
     
     let line_units = [] //array with lines with arrays, containing rgba tables, connected if those are similar
@@ -77,27 +69,23 @@ function png_to_mesh(ctx, img) {
         line_units.push(line);
     }
     //png to mesh
-    const height2 = img.height / px * size / 2;
-    const width2 = img.width / px * size / 2;
     let mesh = {vertexes:[], segments:[], colors:[]};
     let index = 0;
+
     for (let y = 0; y < line_units.length; ++y) {
         let x = 0;
-        let line_segment = [];
         for (let p of line_units[y]) {
-            let x0 = x + size;
-            let x1 = x = x + size * p.length;
+            let x0 = x + 1;
+            let x1 = x = x + p.length;
             if (p.length == 1) {
-                mesh.vertexes.push([x0 - width2, height2 - y * size]);
-                line_segment.push(index);
-                ++index;
+                mesh.vertexes.push([x0, -y]);
+                mesh.segments.push([index, ++index]);
                 mesh.colors.push(get_color_from_rgba(p[0]));
             } else {
-                mesh.vertexes.push([x0 - width2, height2 - y * size]);
-                mesh.vertexes.push([x1 - width2, height2 - y * size]);
-                line_segment.push(  index);
-                line_segment.push(++index);
-                ++index;
+                mesh.vertexes.push([x0, -y]);
+                mesh.vertexes.push([x1, -y]);
+                mesh.segments.push([index, ++index]);
+                mesh.segments.push([index, ++index]);
                 let n = Math.floor(p.length / 2);
                 let c1 = [0, 0, 0, 0], c2 = [0, 0, 0, 0];
                 for (let i = 0; i < n; ++i) {
@@ -114,8 +102,8 @@ function png_to_mesh(ctx, img) {
                 mesh.colors.push(get_color_from_rgba(c2));
             }
         }
-        mesh.segments.push(line_segment);
     }
+    mesh.segments.pop();
     return mesh;
 }
 
@@ -132,31 +120,27 @@ img.onload = function() {
 
     console.log(mesh.vertexes.length);
 
-    const min_color = Math.min(...mesh.colors);
+    const c0 = mesh.colors[0];
+    const bd = 1 - img.width / px;
 
-    let str = `local l,o,m,j,x=${mesh.vertexes[0][0].toFixed(2)},${mesh.vertexes[0][1].toFixed(2)},${size.toFixed(2)},-1,${min_color}
-    local a,b,c=function(w)local h={}for k=1,#w do if w[k]==l then o=o-m end h[k]={w[k],o} end return h
-    end,function(s)local g,z={},{}for n=1,#s do z={}for i=1,s[n] do j=j+1 z[i]=j end g[n]=z end return g
-    end,function(s)local g={}for i=1,#s do g[i]=x+s[i] end return g end`;
+    let str = `local x,y,p,o,t,v,u=${to_float(img.width / px * size / 2, 2)},${to_float(img.height / px * size / 2, 2)},`; //values
+    str += `${to_float(mesh.vertexes[0][0], 2)},${to_float(mesh.vertexes[0][1], 2)},${to_float(size, 2)},${bd},${c0} `; //values
+    str += `local a,b,c=function(s)local g={}for k=1,#s do p=p+s[k] if p==1 then o=o-1 end g[k]={p*t-x,y+o*t}end return g end,`; //creates vertexes
+    str += `function(s)local g={}for n=0,s-1 do g[n+1]={n,n+1}end return g end,`; //creates segments
+    str += `function(s)local g={}for i=1,#s do u=u+s[i] g[i]=u end return g end`; //creates segments
 
-    str += " meshes={{vertexes=a({";
-    for (let i of mesh.vertexes) {
-        if (number_rounding) {
-            let a = i[0].toFixed(2);
-            if (((Math.round(a) + 0.01) >= a) && ((Math.round(a) - 0.01) <= a))
-                a = Math.round(a);
-            str += `${Number(a)},`;
-        } else {
-            str += `${i[0]},`;
-        }
+    str += " meshes={{vertexes=a({0,";
+    for (let i = 1; i < mesh.vertexes.length; ++i) {
+        const t = mesh.vertexes[i][0] - mesh.vertexes[i - 1][0];
+        if (t == bd)
+            str += 'v,';
+        else
+            str += `${mesh.vertexes[i][0] - mesh.vertexes[i - 1][0]},`;
     }
-    str += '}),segments=b({';
-    for (let i of mesh.segments) {
-        str += `${i.length},`;
-    }
-    str += '}),colors=c({';
-    for (let i of mesh.colors) {
-        str += `${i - min_color},`;
+
+    str += `}),segments=b(${mesh.segments.length}),colors=c({0,`;
+    for (let i = 1; i < mesh.colors.length; ++i) {
+        str += `${mesh.colors[i] - mesh.colors[i - 1]},`;
     }
     str += '})}}';
     console.log(str);
