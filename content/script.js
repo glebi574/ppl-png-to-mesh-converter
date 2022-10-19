@@ -2,13 +2,14 @@
 const size = 1.823358421; //line width in ppl to overlap gradient(1.823358421 for pc, 2.418367347 for phone)
 
 const px = 1; //pixels per line to be compressed
-const s = px * px; //amount of pixels in part to be compressed
 const compression = 12; //compression level(how much colors can differ to be united in one line) 0 - 256
+const alpha = 64; //alpha for every pixel
 
 const number_rounding = true; //if true, numbers will be rounded(mostly can't be seen)
-const alpha = 48;
 
 const source = "img.png" //file path
+
+const s = px * px; //amount of pixels in part to be compressed
 
 function to_float(n, f) {
     let a = n.toFixed(f);
@@ -63,18 +64,21 @@ function png_to_mesh(ctx, img) {
 
     for (let y = 0; y < line_units.length; ++y) {
         let x = 0;
+        let line_segment = [];
         for (let p of line_units[y]) {
             let x0 = x + 1;
             let x1 = x = x + p.length;
             if (p.length == 1) {
                 mesh.vertexes.push([x0, -y]);
-                mesh.segments.push([index, ++index]);
+                line_segment.push(index);
+                ++index;
                 mesh.colors.push(p[0]);
             } else {
                 mesh.vertexes.push([x0, -y]);
                 mesh.vertexes.push([x1, -y]);
-                mesh.segments.push([index, ++index]);
-                mesh.segments.push([index, ++index]);
+                line_segment.push(  index);
+                line_segment.push(++index);
+                ++index;
                 let n = Math.floor(p.length / 2);
                 let c1 = [0, 0, 0], c2 = [0, 0, 0];
                 for (let i = 0; i < n; ++i) {
@@ -91,8 +95,8 @@ function png_to_mesh(ctx, img) {
                 mesh.colors.push(c2);
             }
         }
+        mesh.segments.push(line_segment);
     }
-    mesh.segments.pop();
     return mesh;
 }
 
@@ -111,10 +115,10 @@ img.onload = function() {
 
     const bd = 1 - img.width / px;
 
-    let str = `local x,y,p,o,t,v,u=${to_float(img.width / px * size / 2, 2)},${to_float(img.height / px * size / 2, 2)},`; //values
-    str += `${to_float(mesh.vertexes[0][0], 2)},${to_float(mesh.vertexes[0][1], 2)},${to_float(size, 2)},${bd},${alpha} `; //values
+    let str = `local x,y,p,o,t,v,j,u=${to_float(img.width / px * size / 2, 2)},${to_float(img.height / px * size / 2, 2)},`; //values
+    str += `${to_float(mesh.vertexes[0][0], 2)},${to_float(mesh.vertexes[0][1], 2)},${to_float(size, 2)},${bd},-1,${alpha} `; //values
     str += `local a,b,c=function(s)local g={}for k=1,#s do p=p+s[k]if p==1 then o=o-1 end g[k]={p*t-x,y+o*t}end return g end,`; //creates vertexes
-    str += `function(s)local g={}for n=0,s-1 do g[n+1]={n,n+1}end return g end,`; //creates segments
+    str += `function(s)local g,z={},{}for n=1,#s do z={}for i=1,s[n] do j=j+1 z[i]=j end g[n]=z end return g end,`; //creates segments
     str += `function(s)local g={}for i=6,string.len(s),6 do g[#g+1]=u+256*tonumber(string.sub(s,i-5,i),16)end return g end`; //creates colors
 
     str += " meshes={{vertexes=a({0,";
@@ -126,7 +130,12 @@ img.onload = function() {
             str += `${mesh.vertexes[i][0] - mesh.vertexes[i - 1][0]},`;
     }
 
-    str += `}),segments=b(${mesh.segments.length}),colors=c'`;
+    str += '}),segments=b({';
+    for (let i of mesh.segments) {
+        str += `${i.length},`;
+    }
+
+    str += `}),colors=c'`;
     for (let i of mesh.colors) {
         for (let n of i) {
             let h = n.toString(16);
